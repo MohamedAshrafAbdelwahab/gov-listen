@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-// Forwards multipart audio to Gemini-compatible speech APIs and returns JSON { text }.
 export const Route = createFileRoute("/api/transcribe")({
   server: {
     handlers: {
@@ -17,13 +16,12 @@ export const Route = createFileRoute("/api/transcribe")({
 
         const upstream = new FormData();
         upstream.append("file", file, file.name || "recording.webm");
+        upstream.append("model", "gemini-3.5-flash");
         if (lang) upstream.append("language", lang);
 
-        const res = await fetch("https://generativelanguage.googleapis.com/v1beta/files:transcribe", {
+        const res = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/audio/transcriptions", {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${key}`,
-          },
+          headers: { Authorization: `Bearer ${key}` },
           body: upstream,
         });
 

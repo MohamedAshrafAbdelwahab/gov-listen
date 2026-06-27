@@ -13,6 +13,18 @@ export const Route = createFileRoute("/report")({
 
 type Msg = { role: "user" | "assistant"; content: string };
 
+type SpeechRecognitionLike = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onresult: ((event: { resultIndex: number; results: ArrayLike<{ isFinal: boolean; transcript: string }> }) => void) | null;
+  onerror: ((event: { error: string }) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+
 type Fields = {
   title?: string;
   description?: string;
@@ -21,6 +33,18 @@ type Fields = {
   address?: string;
   hasPhoto?: boolean;
 };
+
+declare global {
+  interface Window {
+    webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+    SpeechRecognition?: new () => SpeechRecognitionLike;
+  }
+}
+
+function getSpeechRecognitionCtor() {
+  if (typeof window === "undefined") return null;
+  return window.SpeechRecognition ?? window.webkitSpeechRecognition ?? null;
+}
 
 function ReportPage() {
   const [lang] = useAppLang();
@@ -34,10 +58,13 @@ function ReportPage() {
   const [thinking, setThinking] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [typed, setTyped] = useState("");
+  const [liveTranscript, setLiveTranscript] = useState("");
   const [done, setDone] = useState(false);
   const [finalReport, setFinalReport] = useState<Report | null>(null);
 
   const mediaRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -45,6 +72,13 @@ function ReportPage() {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, thinking, photo]);
+
+  useEffect(() => {
+    return () => {
+      recognitionRef.current?.stop();
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
 
   const callAI = async (next: Msg[], nextFields: Fields, hasPhoto: boolean) => {
     const profile = getProfile()!;
@@ -122,14 +156,69 @@ function ReportPage() {
     setGenerating(false);
   };
 
+  const sendVoiceMessage = async (text: string) => {
+    const content = text.trim();
+    if (!content) return;
+    const next = [...messages, { role: "user" as const, content }];
+    setMessages(next);
+    setTyped(content);
+    setLiveTranscript("");
+    await callAI(next, fields, !!photo);
+  };
+
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      const SpeechRecognitionCtor = getSpeechRecognitionCtor();
+      if (SpeechRecognitionCtor) {
+        const recognition = new SpeechRecognitionCtor();
+        recognition.lang = lang === "ar" ? "ar-EG" : "en-US";
+        recognition.continuous = false;
+        recognition.interimResults = true;
+        recognition.maxAlternatives = 1;
+        recognition.onresult = (event) => {
+          let interim = "";
+          let finalText = "";
+          for (let i = event.resultIndex; i < event.results.length; i += 1) {
+            const result = event.results[i];
+            const transcript = Array.from(result).map((alt) => alt.transcript).join(" ");
+            if (result.isFinal) {
+              finalText += `${transcript} `;
+            } else {
+              interim += transcript;
+            }
+          }
+          if (finalText.trim()) {
+            setLiveTranscript(finalText.trim());
+            void sendVoiceMessage(finalText.trim());
+          } else if (interim.trim()) {
+            setLiveTranscript(interim.trim());
+          }
+        };
+        recognition.onerror = (event) => {
+          console.error("speech recognition error", event.error);
+          setLiveTranscript("");
+        };
+        recognition.onend = () => {
+          recognitionRef.current = null;
+          setRecording(false);
+          streamRef.current?.getTracks().forEach((track) => track.stop());
+          streamRef.current = null;
+        };
+        recognitionRef.current = recognition;
+        recognition.start();
+        setRecording(true);
+        setLiveTranscript("");
+        return;
+      }
+
       chunksRef.current = [];
       const mr = new MediaRecorder(stream);
       mr.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       mr.onstop = async () => {
         stream.getTracks().forEach((tr) => tr.stop());
+        streamRef.current = null;
         const blob = new Blob(chunksRef.current, { type: mr.mimeType || "audio/webm" });
         if (blob.size < 800) return; // ignore empties
         const form = new FormData();
@@ -142,9 +231,7 @@ function ReportPage() {
           if (!r.ok) throw new Error(await r.text());
           const { text } = (await r.json()) as { text: string };
           if (!text.trim()) { setThinking(false); return; }
-          const next = [...messages, { role: "user" as const, content: text }];
-          setMessages(next);
-          await callAI(next, fields, !!photo);
+          await sendVoiceMessage(text);
         } catch (err) {
           console.error(err);
           setThinking(false);
@@ -159,8 +246,12 @@ function ReportPage() {
   };
 
   const stopRecording = () => {
+    recognitionRef.current?.stop();
+    recognitionRef.current = null;
     mediaRef.current?.stop();
     mediaRef.current = null;
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
     setRecording(false);
   };
 
@@ -306,7 +397,7 @@ function ReportPage() {
                 {recording ? <Square className="size-7 fill-current" /> : <Mic className="size-8" />}
               </button>
             </div>
-            <div className="mt-3 h-5">
+            <div className="mt-3 min-h-5 flex flex-col items-center">
               {recording ? (
                 <div className="flex items-end gap-1">
                   {[0, 1, 2, 3, 4].map((i) => (
@@ -316,6 +407,7 @@ function ReportPage() {
               ) : (
                 <p className="text-xs text-muted-foreground">{thinking ? t.sending : t.tapToSpeak}</p>
               )}
+              {liveTranscript ? <p className="text-xs text-foreground/70 mt-1 text-center">{liveTranscript}</p> : null}
             </div>
           </div>
         </div>

@@ -3,6 +3,9 @@ import tailwindcss from "@tailwindcss/vite";
 import viteReact from "@vitejs/plugin-react";
 import tsConfigPaths from "vite-tsconfig-paths";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
+import { nitro } from "nitro/vite";
+
+import { cloudflare } from "@cloudflare/vite-plugin";
 
 export default defineConfig({
   resolve: {
@@ -37,6 +40,11 @@ export default defineConfig({
       server: { entry: "server" },
     }),
     viteReact(),
+    cloudflare({
+      viteEnvironment: {
+        name: "ssr"
+      }
+    }),
   ],
   server: { host: "::", port: 8080 },
 });
