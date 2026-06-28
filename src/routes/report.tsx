@@ -62,16 +62,36 @@ function ReportPage() {
   const [done, setDone] = useState(false);
   const [finalReport, setFinalReport] = useState<Report | null>(null);
 
-  const mediaRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
-  const chunksRef = useRef<BlobPart[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, thinking, photo]);
+
+  // fetch personalised AI greeting on mount; fall back to static t.aiGreeting on error
+  useEffect(() => {
+    const profile = getProfile();
+    if (!profile || !profile.name) return;
+    fetch("/api/extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "greet",
+        lang,
+        country: profile.country,
+        city: profile.city,
+        reporter: { name: profile.name, phone: profile.phone },
+        fields: {},
+        conversation: [],
+      }),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.greeting) setMessages([{ role: "assistant", content: d.greeting }]); })
+      .catch(() => {});
+  }, [lang]);
 
   useEffect(() => {
     return () => {
@@ -213,33 +233,9 @@ function ReportPage() {
         return;
       }
 
-      chunksRef.current = [];
-      const mr = new MediaRecorder(stream);
-      mr.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
-      mr.onstop = async () => {
-        stream.getTracks().forEach((tr) => tr.stop());
-        streamRef.current = null;
-        const blob = new Blob(chunksRef.current, { type: mr.mimeType || "audio/webm" });
-        if (blob.size < 800) return; // ignore empties
-        const form = new FormData();
-        const ext = blob.type.includes("mp4") ? "mp4" : "webm";
-        form.append("file", blob, `recording.${ext}`);
-        if (lang === "ar") form.append("lang", "ar");
-        setThinking(true);
-        try {
-          const r = await fetch("/api/transcribe", { method: "POST", body: form });
-          if (!r.ok) throw new Error(await r.text());
-          const { text } = (await r.json()) as { text: string };
-          if (!text.trim()) { setThinking(false); return; }
-          await sendVoiceMessage(text);
-        } catch (err) {
-          console.error(err);
-          setThinking(false);
-        }
-      };
-      mr.start();
-      mediaRef.current = mr;
-      setRecording(true);
+      stream.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+      alert("Speech recognition is not supported in this browser. Please use Chrome, Edge, or Safari.");
     } catch {
       alert(t.micPermission);
     }
@@ -248,8 +244,6 @@ function ReportPage() {
   const stopRecording = () => {
     recognitionRef.current?.stop();
     recognitionRef.current = null;
-    mediaRef.current?.stop();
-    mediaRef.current = null;
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     setRecording(false);

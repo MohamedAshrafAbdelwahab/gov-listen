@@ -102,7 +102,7 @@ Gov-Listen transforms civic reporting into a **natural conversation**:
 |----------|-----------|
 | **Framework** | [TanStack Start](https://tanstack.com/start/latest) (SSR), [TanStack Router](https://tanstack.com/router/latest), [TanStack Query](https://tanstack.com/query/latest) |
 | **UI** | React 19, TypeScript 5.8, Tailwind CSS v4, [shadcn/ui](https://ui.shadcn.com) |
-| **AI/ML** | Vercel AI SDK, Google Gemini AI (`gemini-3.5-flash`) |
+| **AI/ML** | Vercel AI SDK, Google Gemini AI (`gemini-2.0-flash`) |
 | **Maps** | Leaflet + react-leaflet (OpenStreetMap) |
 | **Charts** | Recharts |
 | **Icons** | Lucide React |

@@ -1,9 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { ArrowRight, Sparkles, User } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { useAppLang, useT } from "@/lib/use-lang";
 import { getProfile, saveProfile } from "@/lib/storage";
+import { getAllCountryCodes, AFRICAN_REGIONS } from "@/lib/country-codes";
 
 export const Route = createFileRoute("/onboard")({
   head: () => ({ meta: [{ title: "Gov-Listen — Get started" }] }),
@@ -15,9 +16,23 @@ function OnboardPage() {
   const t = useT(lang);
   const navigate = useNavigate();
   const profile = getProfile();
+
+  const allCodes = useMemo(() => getAllCountryCodes(), []);
+
   const [name, setName] = useState(profile?.name ?? "");
-  const [phone, setPhone] = useState(profile?.phone ?? "");
   const [nameError, setNameError] = useState("");
+
+  const parsePhone = (full: string | undefined): [string, string] => {
+    if (!full) return ["+20", ""];
+    const sorted = [...allCodes].sort((a, b) => b.code.length - a.code.length);
+    for (const c of sorted) {
+      if (full.startsWith(c.code)) return [c.code, full.slice(c.code.length)];
+    }
+    return ["+20", full];
+  };
+
+  const [countryCode, setCountryCode] = useState(parsePhone(profile?.phone)[0]);
+  const [phoneNumber, setPhoneNumber] = useState(parsePhone(profile?.phone)[1]);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +44,7 @@ function OnboardPage() {
     }
 
     setNameError("");
-    const normalizedPhone = phone.trim() || undefined;
+    const normalizedPhone = phoneNumber.trim() ? `${countryCode}${phoneNumber.trim()}` : undefined;
 
     saveProfile({
       ...(profile ?? { lang, country: "", consented: true }),
@@ -78,13 +93,31 @@ function OnboardPage() {
           <label className="block text-[10px] font-bold tracking-[0.18em] text-muted-foreground uppercase mb-2">
             {t.yourPhone}
           </label>
-          <input
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder={t.phonePlaceholder}
-            className="w-full bg-transparent outline-none text-foreground placeholder:text-muted-foreground font-medium"
-          />
+          <div className="flex items-center gap-2">
+            <select
+              value={countryCode}
+              onChange={(e) => setCountryCode(e.target.value)}
+              className="appearance-none bg-transparent text-foreground font-medium text-sm px-1 py-1.5 shrink-0 w-16"
+            >
+              {AFRICAN_REGIONS.map((region) => (
+                <optgroup key={region.nameEn} label={region.nameEn}>
+                  {region.countries.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.code}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+            <input
+              type="tel"
+              value={phoneNumber}
+              onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
+              placeholder={lang === "ar" ? "مثال 100 123 4567" : "e.g. 100 123 4567"}
+              className="flex-1 bg-transparent outline-none text-foreground placeholder:text-muted-foreground font-medium"
+              dir="ltr"
+            />
+          </div>
         </div>
 
         <div className="flex-1" />

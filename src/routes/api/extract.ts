@@ -4,6 +4,7 @@ import { generateText } from "ai";
 import type { Lang } from "@/lib/i18n";
 
 type ExtractRequest = {
+  action?: "greet";
   lang: Lang;
   country: string;
   city?: string;
@@ -18,6 +19,18 @@ type ExtractRequest = {
   };
   conversation: { role: "user" | "assistant"; content: string }[];
 };
+
+const GREET_EN = `You are Gov-Listen, an AI assistant that helps African citizens file civic reports.
+Generate a short, warm, personalized welcome greeting (1-2 sentences) for the user.
+Mention their name, optionally their location, and invite them to describe the problem.
+Respond in the user's conversation language.
+Output STRICTLY a single JSON object: { "greeting": "..." }`;
+
+const GREET_AR = `أنت Gov-Listen، مساعد ذكي يساعد المواطنين الأفارقة على تقديم بلاغات مدنية.
+أنشئ ترحيباً قصيراً ودافئاً مخصصاً للمستخدم (1-2 جمل).
+اذكر اسمه، وموقعه إن وُجد، وادعه لوصف المشكلة.
+أجب بنفس لغة المستخدم.
+أخرج فقط كائن JSON واحد: { "greeting": "..." }`;
 
 const SYSTEM_EN = `You are Gov-Listen, an AI assistant that helps African citizens file civic reports (broken roads, water leaks, power cuts, waste, safety, etc.) to local government authorities.
 
@@ -69,6 +82,19 @@ export const Route = createFileRoute("/api/extract")({
         const body = (await request.json()) as ExtractRequest;
         const gateway = createGeminiProvider(key);
         const model = gateway("gemini-3.5-flash");
+
+        if (body.action === "greet") {
+          const greetSystem = body.lang === "ar" ? GREET_AR : GREET_EN;
+          const greetUser = body.lang === "ar"
+            ? `المستخدم: ${body.reporter.name}${body.city ? `، من ${body.city}` : ""}${body.country ? `، ${body.country}` : ""}\nاللغة: العربية.`
+            : `User: ${body.reporter.name}${body.city ? `, from ${body.city}` : ""}${body.country ? `, ${body.country}` : ""}\nLanguage: ${body.lang}.`;
+          try {
+            const { text: greetText } = await generateText({ model, messages: [{ role: "system", content: greetSystem }, { role: "user", content: greetUser }] });
+            const cleaned = greetText.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+            const parsed = JSON.parse(cleaned);
+            return Response.json(parsed);
+          } catch { return Response.json({ greeting: "" }); }
+        }
 
         const context = `Context:
 - Reporter: ${body.reporter.name}${body.reporter.phone ? `, phone ${body.reporter.phone}` : ""}

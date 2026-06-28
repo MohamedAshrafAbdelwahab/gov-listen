@@ -2,8 +2,13 @@ import { useEffect, useState } from "react";
 import { translations, type Lang } from "@/lib/i18n";
 import { getProfile, saveProfile } from "@/lib/storage";
 
+function getInitialLang(): Lang {
+  if (typeof document === "undefined") return "en";
+  return (document.documentElement.lang as Lang) || "en";
+}
+
 export function useAppLang(): [Lang, (l: Lang) => void] {
-  const [lang, setLang] = useState<Lang>("en");
+  const [lang, setLang] = useState<Lang>(getInitialLang);
   useEffect(() => {
     const p = getProfile();
     if (p?.lang) {

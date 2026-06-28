@@ -31,8 +31,10 @@ const REPORTS_KEY = "govlisten.reports.v1";
 
 export function getProfile(): UserProfile | null {
   if (typeof window === "undefined") return null;
-  const raw = localStorage.getItem(PROFILE_KEY);
-  return raw ? (JSON.parse(raw) as UserProfile) : null;
+  try {
+    const raw = localStorage.getItem(PROFILE_KEY);
+    return raw ? (JSON.parse(raw) as UserProfile) : null;
+  } catch { return null; }
 }
 export function saveProfile(p: UserProfile) {
   localStorage.setItem(PROFILE_KEY, JSON.stringify(p));

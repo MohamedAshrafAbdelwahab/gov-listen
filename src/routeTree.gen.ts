@@ -16,7 +16,6 @@ import { Route as OnboardRouteImport } from './routes/onboard'
 import { Route as HomeRouteImport } from './routes/home'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TrackIdRouteImport } from './routes/track.$id'
-import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
 import { Route as ApiExtractRouteImport } from './routes/api/extract'
 
 const WelcomeRoute = WelcomeRouteImport.update({
@@ -54,11 +53,6 @@ const TrackIdRoute = TrackIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => TrackRoute,
 } as any)
-const ApiTranscribeRoute = ApiTranscribeRouteImport.update({
-  id: '/api/transcribe',
-  path: '/api/transcribe',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiExtractRoute = ApiExtractRouteImport.update({
   id: '/api/extract',
   path: '/api/extract',
@@ -73,7 +67,6 @@ export interface FileRoutesByFullPath {
   '/track': typeof TrackRouteWithChildren
   '/welcome': typeof WelcomeRoute
   '/api/extract': typeof ApiExtractRoute
-  '/api/transcribe': typeof ApiTranscribeRoute
   '/track/$id': typeof TrackIdRoute
 }
 export interface FileRoutesByTo {
@@ -84,7 +77,6 @@ export interface FileRoutesByTo {
   '/track': typeof TrackRouteWithChildren
   '/welcome': typeof WelcomeRoute
   '/api/extract': typeof ApiExtractRoute
-  '/api/transcribe': typeof ApiTranscribeRoute
   '/track/$id': typeof TrackIdRoute
 }
 export interface FileRoutesById {
@@ -96,7 +88,6 @@ export interface FileRoutesById {
   '/track': typeof TrackRouteWithChildren
   '/welcome': typeof WelcomeRoute
   '/api/extract': typeof ApiExtractRoute
-  '/api/transcribe': typeof ApiTranscribeRoute
   '/track/$id': typeof TrackIdRoute
 }
 export interface FileRouteTypes {
@@ -109,7 +100,6 @@ export interface FileRouteTypes {
     | '/track'
     | '/welcome'
     | '/api/extract'
-    | '/api/transcribe'
     | '/track/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -120,7 +110,6 @@ export interface FileRouteTypes {
     | '/track'
     | '/welcome'
     | '/api/extract'
-    | '/api/transcribe'
     | '/track/$id'
   id:
     | '__root__'
@@ -131,7 +120,6 @@ export interface FileRouteTypes {
     | '/track'
     | '/welcome'
     | '/api/extract'
-    | '/api/transcribe'
     | '/track/$id'
   fileRoutesById: FileRoutesById
 }
@@ -143,7 +131,6 @@ export interface RootRouteChildren {
   TrackRoute: typeof TrackRouteWithChildren
   WelcomeRoute: typeof WelcomeRoute
   ApiExtractRoute: typeof ApiExtractRoute
-  ApiTranscribeRoute: typeof ApiTranscribeRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -197,13 +184,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TrackIdRouteImport
       parentRoute: typeof TrackRoute
     }
-    '/api/transcribe': {
-      id: '/api/transcribe'
-      path: '/api/transcribe'
-      fullPath: '/api/transcribe'
-      preLoaderRoute: typeof ApiTranscribeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/extract': {
       id: '/api/extract'
       path: '/api/extract'
@@ -232,7 +212,6 @@ const rootRouteChildren: RootRouteChildren = {
   TrackRoute: TrackRouteWithChildren,
   WelcomeRoute: WelcomeRoute,
   ApiExtractRoute: ApiExtractRoute,
-  ApiTranscribeRoute: ApiTranscribeRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
