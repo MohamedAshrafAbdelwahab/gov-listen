@@ -1,6 +1,6 @@
 # Gov-Listen 🌍🗣️
 
-🚀 **[Click Here to Experience the Live Demo](https://gov-listen.mohamedashraf.workers.dev)**
+🚀 **[Click Here to Experience the Live Demo](https://gov-listen.vercel.app)**
 
 **Developed by:** Mohamed Ashraf Abdelwahab Mohamed  
 **Submitted for:** The 3rd Edition of the Presidential African Youth in AI and Robotics Competition 2026  
@@ -18,7 +18,7 @@
 - [Tech Stack](#-tech-stack)
 - [Project Structure](#-project-structure)
 - [Getting Started](#-getting-started)
-- [API Routes](#-api-routes)
+- [Server Functions](#-server-functions)
 - [Multi-Language Support](#-multi-language-support)
 - [Government Authority Routing](#-government-authority-routing)
 - [Screenshots](#-screenshots)
@@ -68,7 +68,7 @@ Gov-Listen transforms civic reporting into a **natural conversation**:
 ### Step-by-Step Flow
 
 1. **Voice or Text Input** — Press the microphone and describe the issue naturally, or type it out
-2. **AI Transcription** — Speech is transcribed via Google Gemini Speech API
+2. **AI Transcription** — Speech is transcribed via the browser's built-in SpeechRecognition API (Chrome, Edge, Safari)
 3. **Conversational Extraction** — The AI asks smart follow-up questions to gather all required details (title, description, category, priority, address)
 4. **Photo Evidence** — Optionally attach a photo taken with your device camera
 5. **Professional Report** — A polished, formal report is generated suitable for submission to government authorities
@@ -102,13 +102,13 @@ Gov-Listen transforms civic reporting into a **natural conversation**:
 |----------|-----------|
 | **Framework** | [TanStack Start](https://tanstack.com/start/latest) (SSR), [TanStack Router](https://tanstack.com/router/latest), [TanStack Query](https://tanstack.com/query/latest) |
 | **UI** | React 19, TypeScript 5.8, Tailwind CSS v4, [shadcn/ui](https://ui.shadcn.com) |
-| **AI/ML** | Vercel AI SDK, Google Gemini AI (`gemini-2.0-flash`) |
+| **AI/ML** | OpenCode Zen API (DeepSeek V4 Flash Free) |
 | **Maps** | Leaflet + react-leaflet (OpenStreetMap) |
 | **Charts** | Recharts |
 | **Icons** | Lucide React |
 | **Forms** | react-hook-form + zod |
 | **Build Tool** | Vite 8 |
-| **Deployment** | Cloudflare Workers |
+| **Deployment** | Vercel |
 | **Package Manager** | npm |
 
 ---
@@ -127,25 +127,19 @@ gov-listen2/
 │   │   ├── home.tsx              # User dashboard (/home)
 │   │   ├── report.tsx            # AI conversational report creation (/report)
 │   │   ├── track.tsx             # Report list (/track)
-│   │   ├── track.$id.tsx         # Report detail with timeline (/track/$id)
-│   │   └── api/
-│   │       ├── transcribe.ts     # POST /api/transcribe (audio → text)
-│   │       └── extract.ts        # POST /api/extract (conversation → structured report)
+│   │   └── track.$id.tsx         # Report detail with timeline (/track/$id)
 │   ├── lib/
 │   │   ├── i18n.ts               # Translations (8 languages, ~108 keys)
 │   │   ├── use-lang.ts           # Language hook + persistence
 │   │   ├── storage.ts            # localStorage CRUD (profile + reports)
 │   │   ├── authorities.ts        # Government authority registry (55 AU states)
 │   │   ├── geo.ts                # Geolocation detection
-│   │   ├── ai-gateway.server.ts  # Gemini provider factory
-│   │   ├── utils.ts              # cn() utility
-│   │   ├── error-page.ts         # SSR error page
-│   │   └── error-capture.ts      # Global error capture
+│   │   ├── extract.ts            # Server-side AI extraction (OpenCode Zen)
+│   │   └── utils.ts              # cn() utility
 │   ├── components/
 │   │   ├── AppShell.tsx          # Layout wrapper
 │   │   ├── hooks/use-mobile.tsx  # Mobile detection hook
 │   │   └── ui/                   # 40+ shadcn/ui components
-│   ├── server.ts                 # Server entry (SSR error handling)
 │   ├── router.tsx                # Router creation
 │   ├── routeTree.gen.ts          # Auto-generated route tree
 │   ├── styles.css                # Tailwind v4 theme + custom styles
@@ -165,7 +159,7 @@ gov-listen2/
 
 - **Node.js** >= 22.12.0
 - **npm** (or bun)
-- A **Google Gemini API key** (for AI features)
+- An **OpenCode Zen API key** (free tier available at [opencode.ai/zen](https://opencode.ai/docs/zen/))
 
 ### Installation
 
@@ -178,8 +172,8 @@ cd gov-listen2
 npm install
 
 # Set up environment variables
-# Create .env.local and add your Gemini API key:
-# GEMINI_API_KEY=your_api_key_here
+# Create .env.local and add your OpenCode Zen API key:
+# ZEN_API_KEY=your_api_key_here
 
 # Start development server
 npm run dev
@@ -190,41 +184,31 @@ npm run dev
 | Script | Description |
 |--------|-------------|
 | `npm run dev` | Start development server |
-| `npm run build` | Build for production (Cloudflare Workers) |
+| `npm run build` | Build for production (Vercel) |
 | `npm run preview` | Preview production build |
 | `npm run lint` | Run ESLint |
 | `npm run format` | Format code with Prettier |
 
 ---
 
-## 🌐 API Routes
+## 🌐 Server Functions
 
-### `POST /api/transcribe`
+### `extractData` (Server Function)
 
-Transcribes audio speech to text using Google Gemini Speech API.
+Handles AI-powered conversational report extraction using OpenCode Zen API.
 
-**Request:** `multipart/form-data`
-- `file` — Audio blob (webm/mp4)
-- `lang` — (optional) Language hint
+**Called via:** `extractData({ data: { ... } })` from client components.
 
-**Response:** `{ text: "transcribed text" }`
-
-### `POST /api/extract`
-
-Extracts structured report fields from a conversational AI interaction.
-
-**Request:** `application/json`
-```json
+**Request:**
+```typescript
 {
-  "lang": "en",
-  "country": "EG",
-  "city": "Cairo",
-  "reporter": { "name": "John", "phone": "+201..." },
-  "fields": { "title": "...", "description": "...", ... },
-  "conversation": [
-    { "role": "user", "content": "..." },
-    { "role": "assistant", "content": "..." }
-  ]
+  action?: "greet",        // Optional: request a greeting
+  lang: "en" | "ar" | ...,
+  country: "EG",
+  city?: "Cairo",
+  reporter: { name: "John", phone?: "+201..." },
+  fields: { title?: "...", description?: "...", category?: "...", priority?: "...", address?: "...", hasPhoto?: boolean },
+  conversation: Array<{ role: "user" | "assistant", content: string }>
 }
 ```
 
@@ -237,6 +221,8 @@ Extracts structured report fields from a conversational AI interaction.
   "finalDescription": "..."
 }
 ```
+
+**AI Provider:** OpenCode Zen (DeepSeek V4 Flash Free) with automatic fallback to MiMo-V2.5 Free and Big Pickle.
 
 ---
 
