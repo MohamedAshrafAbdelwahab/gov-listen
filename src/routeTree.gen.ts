@@ -16,7 +16,6 @@ import { Route as OnboardRouteImport } from './routes/onboard'
 import { Route as HomeRouteImport } from './routes/home'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TrackIdRouteImport } from './routes/track.$id'
-import { Route as ApiExtractRouteImport } from './routes/api/extract'
 
 const WelcomeRoute = WelcomeRouteImport.update({
   id: '/welcome',
@@ -53,11 +52,6 @@ const TrackIdRoute = TrackIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => TrackRoute,
 } as any)
-const ApiExtractRoute = ApiExtractRouteImport.update({
-  id: '/api/extract',
-  path: '/api/extract',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -66,7 +60,6 @@ export interface FileRoutesByFullPath {
   '/report': typeof ReportRoute
   '/track': typeof TrackRouteWithChildren
   '/welcome': typeof WelcomeRoute
-  '/api/extract': typeof ApiExtractRoute
   '/track/$id': typeof TrackIdRoute
 }
 export interface FileRoutesByTo {
@@ -76,7 +69,6 @@ export interface FileRoutesByTo {
   '/report': typeof ReportRoute
   '/track': typeof TrackRouteWithChildren
   '/welcome': typeof WelcomeRoute
-  '/api/extract': typeof ApiExtractRoute
   '/track/$id': typeof TrackIdRoute
 }
 export interface FileRoutesById {
@@ -87,7 +79,6 @@ export interface FileRoutesById {
   '/report': typeof ReportRoute
   '/track': typeof TrackRouteWithChildren
   '/welcome': typeof WelcomeRoute
-  '/api/extract': typeof ApiExtractRoute
   '/track/$id': typeof TrackIdRoute
 }
 export interface FileRouteTypes {
@@ -99,7 +90,6 @@ export interface FileRouteTypes {
     | '/report'
     | '/track'
     | '/welcome'
-    | '/api/extract'
     | '/track/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -109,7 +99,6 @@ export interface FileRouteTypes {
     | '/report'
     | '/track'
     | '/welcome'
-    | '/api/extract'
     | '/track/$id'
   id:
     | '__root__'
@@ -119,7 +108,6 @@ export interface FileRouteTypes {
     | '/report'
     | '/track'
     | '/welcome'
-    | '/api/extract'
     | '/track/$id'
   fileRoutesById: FileRoutesById
 }
@@ -130,7 +118,6 @@ export interface RootRouteChildren {
   ReportRoute: typeof ReportRoute
   TrackRoute: typeof TrackRouteWithChildren
   WelcomeRoute: typeof WelcomeRoute
-  ApiExtractRoute: typeof ApiExtractRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -184,13 +171,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TrackIdRouteImport
       parentRoute: typeof TrackRoute
     }
-    '/api/extract': {
-      id: '/api/extract'
-      path: '/api/extract'
-      fullPath: '/api/extract'
-      preLoaderRoute: typeof ApiExtractRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
@@ -211,7 +191,6 @@ const rootRouteChildren: RootRouteChildren = {
   ReportRoute: ReportRoute,
   TrackRoute: TrackRouteWithChildren,
   WelcomeRoute: WelcomeRoute,
-  ApiExtractRoute: ApiExtractRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

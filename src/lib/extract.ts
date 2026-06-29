@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createServerFn } from "@tanstack/react-start";
 import type { Lang } from "@/lib/i18n";
 
 type ExtractRequest = {
@@ -65,7 +65,7 @@ const SYSTEM_AR = `أنت Gov-Listen، مساعد ذكي يساعد المواط
 6. عندما تكتمل البيانات اضبط done=true وأعد وصفاً احترافياً منمّقاً (6-10 جمل) مُقسّماً كالتالي:
    - **ملخص**: جملة واحدة تحدد نوع المشكلة وموقعها.
    - **تفاصيل الحادث**: 2-3 جمل تصف المشكلة والحالات الراهنة.
-   - **تقييم التأثير**: 2-3 جمل تشرح التأثير على المواطنين ومخاطر السلامة والمستوى الإلحاحي.
+   - **تقييم التأثير**: 2-3 جمل تشرح التأثير على المواطنين و安全隐患 والمستوى الإلحاحي.
    - **الإجراءات المقترحة**: 2-3 جمل تقترح إجراءات محددة يتعين على الجهة اتخاذها والمخرج المتوقع.
 
 أعد فقط كائن JSON واحد بدون أي شرح وبدون Markdown بالشكل:
@@ -100,7 +100,7 @@ async function runAI(messages: { role: string; content: string }[]): Promise<str
   );
 
   const json = (await res.json()) as Record<string, unknown>;
-  
+
   if (!json.success) {
     const errors = json.errors as Array<{ code?: number; message?: string }> | undefined;
     const errorCode = errors?.[0]?.code;
@@ -112,105 +112,86 @@ async function runAI(messages: { role: string; content: string }[]): Promise<str
 
   const result = json.result as Record<string, unknown> | undefined;
   const response = result?.response;
-  
+
   if (typeof response === "string") return response;
   if (response != null) return String(response);
   throw new Error("Unexpected AI response: " + JSON.stringify(json.result));
 }
 
-export const Route = createFileRoute("/api/extract")({
-  server: {
-    handlers: {
-      POST: async ({ request }) => {
-        const body = (await request.json()) as ExtractRequest;
+function extractJsonObject(value: string): string | null {
+  const start = value.indexOf("{");
+  if (start === -1) return null;
+  let depth = 0;
+  for (let i = start; i < value.length; i += 1) {
+    if (value[i] === "{") depth += 1;
+    else if (value[i] === "}") {
+      depth -= 1;
+      if (depth === 0) return value.slice(start, i + 1);
+    }
+  }
+  return null;
+}
 
-        if (body.action === "greet") {
-          const greetSystem = body.lang === "ar" ? GREET_AR : GREET_EN;
-          const greetUser = body.lang === "ar"
-            ? `المستخدم: ${body.reporter.name}${body.city ? `، من ${body.city}` : ""}${body.country ? `، ${body.country}` : ""}\nاللغة: العربية.`
-            : `User: ${body.reporter.name}${body.city ? `, from ${body.city}` : ""}${body.country ? `, ${body.country}` : ""}\nLanguage: ${body.lang}.`;
-          try {
-            const text = await runAI([
-              { role: "system", content: greetSystem },
-              { role: "user", content: greetUser },
-            ]);
-            const cleaned = String(text).trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
-            const parsed = JSON.parse(cleaned);
-            return Response.json(parsed);
-          } catch (err) {
-            if (err instanceof Error && err.message === "QUOTA_EXCEEDED") {
-              return Response.json(
-                { error: "quota_exceeded", message: body.lang === "ar" ? "تم استنفاد حد الاستخدام اليومي للذكاء الاصطناعي. يرجى المحاولة مرة أخرى غداً." : "AI daily quota exceeded. Please try again tomorrow." },
-                { status: 429 },
-              );
-            }
-            return Response.json({ greeting: "" });
-          }
+function parseAIResponse(text: string): Record<string, unknown> {
+  const cleaned = String(text).trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    const jsonText = extractJsonObject(cleaned);
+    if (jsonText) return JSON.parse(jsonText);
+    throw new Error("No JSON object found in AI response");
+  }
+}
+
+const QUOTA_MSG_EN = "Our AI has reached its daily usage limit. You can type your report manually below, or try again tomorrow. Thank you for your patience!";
+const QUOTA_MSG_AR = "تم استنفاد الحد اليومي للذكاء الاصطناعي. يمكنك كتابة بلاغك يدوياً أدناه، أو المحاولة مجدداً غداً. شكراً لصبرك!";
+
+export const extractData = createServerFn({ method: "POST" })
+  .validator((data: ExtractRequest) => data)
+  .handler(async ({ data }) => {
+    if (data.action === "greet") {
+      const greetSystem = data.lang === "ar" ? GREET_AR : GREET_EN;
+      const greetUser = data.lang === "ar"
+        ? `المستخدم: ${data.reporter.name}${data.city ? `، من ${data.city}` : ""}${data.country ? `، ${data.country}` : ""}\nاللغة: العربية.`
+        : `User: ${data.reporter.name}${data.city ? `, from ${data.city}` : ""}${data.country ? `, ${data.country}` : ""}\nLanguage: ${data.lang}.`;
+      try {
+        const text = await runAI([
+          { role: "system", content: greetSystem },
+          { role: "user", content: greetUser },
+        ]);
+        return parseAIResponse(text);
+      } catch (err) {
+        if (err instanceof Error && err.message === "QUOTA_EXCEEDED") {
+          return { error: "quota_exceeded", message: data.lang === "ar" ? QUOTA_MSG_AR : QUOTA_MSG_EN };
         }
+        return { greeting: "" };
+      }
+    }
 
-        const context = `Context:
-- Reporter: ${body.reporter.name}${body.reporter.phone ? `, phone ${body.reporter.phone}` : ""}
-- Country: ${body.country}${body.city ? `, city ${body.city}` : ""}
-- Fields so far: ${JSON.stringify(body.fields)}
-- Photo attached: ${body.fields.hasPhoto ? "yes" : "no"}
+    const context = `Context:
+- Reporter: ${data.reporter.name}${data.reporter.phone ? `, phone ${data.reporter.phone}` : ""}
+- Country: ${data.country}${data.city ? `, city ${data.city}` : ""}
+- Fields so far: ${JSON.stringify(data.fields)}
+- Photo attached: ${data.fields.hasPhoto ? "yes" : "no"}
 
 Conversation:
-${body.conversation.map((m) => `${m.role}: ${m.content}`).join("\n")}`;
+${data.conversation.map((m) => `${m.role}: ${m.content}`).join("\n")}`;
 
-        const systemPrompt = body.lang === "ar" ? SYSTEM_AR : SYSTEM_EN;
-        const userPrompt = body.lang === "ar"
-          ? `${context}\nاتبع اللغة العربية في جميع الردود. أجب فقط بكائن JSON واحد بدون أي شرح.`
-          : `${context}\nFollow the same language as the user's conversation. Answer only with a single JSON object without any explanation.`;
+    const systemPrompt = data.lang === "ar" ? SYSTEM_AR : SYSTEM_EN;
+    const userPrompt = data.lang === "ar"
+      ? `${context}\nاتبع اللغة العربية في جميع الردود. أجب فقط بكائن JSON واحد بدون أي شرح.`
+      : `${context}\nFollow the same language as the user's conversation. Answer only with a single JSON object without any explanation.`;
 
-        try {
-          const text = await runAI([
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ]);
-
-          const cleaned = String(text)
-            .trim()
-            .replace(/^```(?:json)?/i, "")
-            .replace(/```$/, "")
-            .trim();
-
-          const extractJsonObject = (value: string): string | null => {
-            const start = value.indexOf("{");
-            if (start === -1) return null;
-            let depth = 0;
-            for (let i = start; i < value.length; i += 1) {
-              if (value[i] === "{") depth += 1;
-              else if (value[i] === "}") {
-                depth -= 1;
-                if (depth === 0) return value.slice(start, i + 1);
-              }
-            }
-            return null;
-          };
-
-          let parsed: unknown = {};
-          try {
-            parsed = JSON.parse(cleaned);
-          } catch {
-            const jsonText = extractJsonObject(cleaned);
-            if (jsonText) {
-              parsed = JSON.parse(jsonText);
-            } else {
-              throw new Error("No JSON object found in AI response");
-            }
-          }
-          return Response.json(parsed);
-        } catch (err) {
-          if (err instanceof Error && err.message === "QUOTA_EXCEEDED") {
-            return Response.json(
-              { error: "quota_exceeded", message: body.lang === "ar" ? "تم استنفاد حد الاستخدام اليومي للذكاء الاصطناعي. يرجى المحاولة مرة أخرى غداً." : "AI daily quota exceeded. Please try again tomorrow." },
-              { status: 429 },
-            );
-          }
-          const msg = err instanceof Error ? err.message : "AI error";
-          return new Response(msg, { status: 500 });
-        }
-      },
-    },
-  },
-});
+    try {
+      const text = await runAI([
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ]);
+      return parseAIResponse(text);
+    } catch (err) {
+      if (err instanceof Error && err.message === "QUOTA_EXCEEDED") {
+        return { error: "quota_exceeded", message: data.lang === "ar" ? QUOTA_MSG_AR : QUOTA_MSG_EN };
+      }
+      throw err;
+    }
+  });

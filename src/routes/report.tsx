@@ -5,6 +5,7 @@ import { AppShell } from "@/components/AppShell";
 import { useAppLang, useT } from "@/lib/use-lang";
 import { getProfile, saveReport, newTrackingId, type Report } from "@/lib/storage";
 import { resolveAuthority, getLocalizedName, type Category, CATEGORIES } from "@/lib/authorities";
+import { extractData } from "@/lib/extract";
 import type { Lang } from "@/lib/i18n";
 
 export const Route = createFileRoute("/report")({
@@ -60,21 +61,6 @@ function getSpeechRecognitionCtor() {
   return window.SpeechRecognition ?? window.webkitSpeechRecognition ?? null;
 }
 
-async function fetchAI(endpoint: string, body: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const res = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const json = (await res.json()) as Record<string, unknown>;
-  if (!res.ok) {
-    const err = new Error((json.message as string) ?? "AI request failed");
-    (err as Error & { status?: number }).status = res.status;
-    throw err;
-  }
-  return json;
-}
-
 function ReportPage() {
   const [lang] = useAppLang();
   const t = useT(lang);
@@ -104,14 +90,16 @@ function ReportPage() {
   useEffect(() => {
     const profile = getProfile();
     if (!profile || !profile.name) return;
-    fetchAI("/api/extract", {
-      action: "greet",
-      lang,
-      country: profile.country,
-      city: profile.city,
-      reporter: { name: profile.name },
-      fields: {},
-      conversation: [],
+    extractData({
+      data: {
+        action: "greet",
+        lang,
+        country: profile.country,
+        city: profile.city,
+        reporter: { name: profile.name },
+        fields: {},
+        conversation: [],
+      },
     })
       .then((data) => {
         if (data.greeting) {
@@ -132,13 +120,15 @@ function ReportPage() {
     const profile = getProfile()!;
     setThinking(true);
     try {
-      const data = await fetchAI("/api/extract", {
-        lang,
-        country: profile.country,
-        city: profile.city,
-        reporter: { name: profile.name, phone: profile.phone },
-        fields: nextFields,
-        conversation: next,
+      const data = await extractData({
+        data: {
+          lang,
+          country: profile.country,
+          city: profile.city,
+          reporter: { name: profile.name, phone: profile.phone },
+          fields: nextFields,
+          conversation: next,
+        },
       });
 
       if (data.error === "quota_exceeded") {
