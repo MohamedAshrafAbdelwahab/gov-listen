@@ -89,7 +89,7 @@ Gov-Listen transforms civic reporting into a **natural conversation**:
 | 🏛️ **Authority Routing** | Auto-matches reports to the correct government agency |
 | 🔍 **Unique Tracking IDs** | Every report gets a `GL-XX-XXXX` ID with status timeline |
 | 🌍 **55 African Union States** | Architecture supports all AU member countries |
-| 🌐 **Multi-Language** | Full Arabic + English, Kiswahili partial, 5 more languages in progress |
+| 🌐 **Multi-Language** | Full support for 8 languages: English, Arabic, Kiswahili, Yoruba, Hausa, Amharic, isiXhosa, isiZulu |
 | 📱 **Mobile-First Design** | Optimized for smartphones with touch-friendly UI |
 | ↔️ **RTL Support** | Full right-to-left layout for Arabic |
 | 📊 **Status Tracking** | Timeline view with Received → Forwarded → Reviewed states |
@@ -116,7 +116,7 @@ Gov-Listen transforms civic reporting into a **natural conversation**:
 ## 📁 Project Structure
 
 ```
-gov-listen2/
+gov-listen/
 ├── public/                        # Static assets (icon, manifest)
 ├── src/
 │   ├── routes/
@@ -129,11 +129,12 @@ gov-listen2/
 │   │   ├── track.tsx             # Report list (/track)
 │   │   └── track.$id.tsx         # Report detail with timeline (/track/$id)
 │   ├── lib/
-│   │   ├── i18n.ts               # Translations (8 languages, ~108 keys)
+│   │   ├── i18n.ts               # Translations (8 languages, 103 keys each)
 │   │   ├── use-lang.ts           # Language hook + persistence
 │   │   ├── storage.ts            # localStorage CRUD (profile + reports)
 │   │   ├── authorities.ts        # Government authority registry (55 AU states)
 │   │   ├── geo.ts                # Geolocation detection
+│   │   ├── country-codes.ts      # African country phone codes by region
 │   │   ├── extract.ts            # Server-side AI extraction (OpenCode Zen)
 │   │   └── utils.ts              # cn() utility
 │   ├── components/
@@ -165,8 +166,8 @@ gov-listen2/
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/gov-listen2.git
-cd gov-listen2
+git clone https://github.com/MohamedAshrafAbdelwahab/gov-listen.git
+cd gov-listen
 
 # Install dependencies
 npm install
@@ -232,20 +233,20 @@ Handles AI-powered conversational report extraction using OpenCode Zen API.
 |----------|------|--------|
 | English | `en` | ✅ Full |
 | العربية (Arabic) | `ar` | ✅ Full (RTL) |
-| Kiswahili | `sw` | 🔶 Partial |
-| Yoruba | `yo` | 🚧 Coming Soon |
-| Hausa | `ha` | 🚧 Coming Soon |
-| Amharic | `am` | 🚧 Coming Soon |
-| isiXhosa | `xh` | 🚧 Coming Soon |
-| isiZulu | `zu` | 🚧 Coming Soon |
+| Kiswahili | `sw` | ✅ Full |
+| Yoruba | `yo` | ✅ Full |
+| Hausa | `ha` | ✅ Full |
+| Amharic | `am` | ✅ Full (101/103 keys) |
+| isiXhosa | `xh` | ✅ Full |
+| isiZulu | `zu` | ✅ Full |
 
-~108 translation keys per language covering the full app experience. Arabic includes full RTL layout with Cairo font.
+103 translation keys per language covering the full app experience. Arabic includes full RTL layout with Cairo font.
 
 ---
 
 ## 🏛️ Government Authority Routing
 
-The platform includes a built-in registry of government authorities for **6 countries** across **6 issue categories**:
+The platform includes a built-in registry of government authorities for **5 countries** across **6 issue categories**:
 
 | Category | Description |
 |----------|-------------|
@@ -264,17 +265,14 @@ The architecture supports **all 55 African Union states** — additional countri
 
 ## 📸 Screenshots
 
-> *Screenshots coming soon*
-
-| Page | Description |
-|------|-------------|
-| Landing | Marketing page with problem/solution/features |
-| Welcome | Location detection + language selection + interactive map |
-| Onboarding | Name and phone number collection |
-| Dashboard | User home with quick actions and report count |
-| Report | Conversational AI interface with microphone |
-| Tracking | List of all submitted reports with status |
-| Report Detail | Full report view with timeline and authority info |
+| Page | Screenshot |
+|------|------------|
+| Welcome | ![Welcome](screenshots/screencapture-gov-listen-vercel-app-welcome-2026-06-29-20_02_50.png) |
+| Onboarding | ![Onboarding](screenshots/screencapture-gov-listen-vercel-app-onboard-2026-06-29-20_03_17.png) |
+| Dashboard | ![Dashboard](screenshots/screencapture-gov-listen-vercel-app-home-2026-06-29-20_03_25.png) |
+| Report (AI Conversation) | ![Report Conversation](screenshots/screencapture-gov-listen-vercel-app-report-2026-06-29-20_06_28.png) |
+| Report (Submitted) | ![Report Submitted](screenshots/screencapture-gov-listen-vercel-app-report-2026-06-29-20_07_46.png) |
+| Tracking | ![Tracking](screenshots/screencapture-gov-listen-vercel-app-track-GL-EG-6727-2026-06-29-20_08_03.png) |
 
 ---
 
