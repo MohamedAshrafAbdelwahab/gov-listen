@@ -1,6 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { createGeminiProvider } from "@/lib/ai-gateway.server";
-import { generateText } from "ai";
 import type { Lang } from "@/lib/i18n";
 
 type ExtractRequest = {
@@ -42,7 +40,11 @@ Your job each turn:
 3. Allowed category values: roads, water, electricity, waste, safety, other.
 4. Allowed priority values: low, medium, urgent.
 5. If a key field is still missing, ask ONE short friendly follow-up question. If a photo would clearly help and none is attached, you may ask for one.
-6. When you have enough, set done=true and return a polished professional report description (2-4 sentences) suitable for the authority.
+6. When you have enough, set done=true and return a comprehensive professional report description (6-10 sentences) structured as follows:
+   - **Summary**: One sentence stating the issue type and location.
+   - **Incident Details**: 2-3 sentences describing the problem, when it occurs, and current conditions.
+   - **Impact Assessment**: 2-3 sentences explaining the impact on citizens, safety risks, and urgency.
+   - **Recommended Actions**: 2-3 sentences suggesting specific actions the authority should take and expected outcome.
 
 Output STRICTLY a single JSON object, no prose, no markdown, with shape:
 {
@@ -60,7 +62,11 @@ const SYSTEM_AR = `أنت Gov-Listen، مساعد ذكي يساعد المواط
 3. قيم التصنيف المسموحة: roads, water, electricity, waste, safety, other.
 4. قيم الأولوية: low, medium, urgent.
 5. إذا نقص حقل مهم اسأل سؤالاً واحداً قصيراً وودوداً. يمكنك طلب صورة إن كانت ستساعد.
-6. عندما تكتمل البيانات اضبط done=true وأعد وصفاً احترافياً منمّقاً (2-4 جمل) صالحاً لإرساله للجهة.
+6. عندما تكتمل البيانات اضبط done=true وأعد وصفاً احترافياً منمّقاً (6-10 جمل) مُقسّماً كالتالي:
+   - **ملخص**: جملة واحدة تحدد نوع المشكلة وموقعها.
+   - **تفاصيل الحادث**: 2-3 جمل تصف المشكلة والحالات الراهنة.
+   - **تقييم التأثير**: 2-3 جمل تشرح التأثير على المواطنين ومخاطر السلامة والمستوى الإلحاحي.
+   - **الإجراءات المقترحة**: 2-3 جمل تقترح إجراءات محددة يتعين على الجهة اتخاذها والمخرج المتوقع.
 
 أعد فقط كائن JSON واحد بدون أي شرح وبدون Markdown بالشكل:
 {
@@ -72,16 +78,46 @@ const SYSTEM_AR = `أنت Gov-Listen، مساعد ذكي يساعد المواط
 
 اكتب الأسئلة والوصف النهائي باللغة العربية.`;
 
+const CF_AI_MODEL = "@cf/meta/llama-3.1-8b-instruct";
+
+async function runAI(messages: { role: string; content: string }[]): Promise<string> {
+  const CF_ACCOUNT_ID = process.env.CF_AI_ACCOUNT_ID;
+  const CF_API_TOKEN = process.env.CF_AI_API_TOKEN;
+  if (!CF_ACCOUNT_ID || !CF_API_TOKEN) {
+    throw new Error("Missing CF_AI_ACCOUNT_ID or CF_AI_API_TOKEN in env");
+  }
+
+  const res = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/ai/run/${CF_AI_MODEL}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${CF_API_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ messages }),
+    },
+  );
+
+  const json = (await res.json()) as Record<string, unknown>;
+  
+  if (!json.success) {
+    throw new Error(JSON.stringify(json.errors ?? "AI request failed"));
+  }
+
+  const result = json.result as Record<string, unknown> | undefined;
+  const response = result?.response;
+  
+  if (typeof response === "string") return response;
+  if (response != null) return String(response);
+  throw new Error("Unexpected AI response: " + JSON.stringify(json.result));
+}
+
 export const Route = createFileRoute("/api/extract")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const key = process.env.GEMINI_API_KEY;
-        if (!key) return new Response("Missing GEMINI_API_KEY", { status: 500 });
-
         const body = (await request.json()) as ExtractRequest;
-        const gateway = createGeminiProvider(key);
-        const model = gateway("gemini-3.5-flash");
 
         if (body.action === "greet") {
           const greetSystem = body.lang === "ar" ? GREET_AR : GREET_EN;
@@ -89,8 +125,11 @@ export const Route = createFileRoute("/api/extract")({
             ? `المستخدم: ${body.reporter.name}${body.city ? `، من ${body.city}` : ""}${body.country ? `، ${body.country}` : ""}\nاللغة: العربية.`
             : `User: ${body.reporter.name}${body.city ? `, from ${body.city}` : ""}${body.country ? `, ${body.country}` : ""}\nLanguage: ${body.lang}.`;
           try {
-            const { text: greetText } = await generateText({ model, messages: [{ role: "system", content: greetSystem }, { role: "user", content: greetUser }] });
-            const cleaned = greetText.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+            const text = await runAI([
+              { role: "system", content: greetSystem },
+              { role: "user", content: greetUser },
+            ]);
+            const cleaned = String(text).trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
             const parsed = JSON.parse(cleaned);
             return Response.json(parsed);
           } catch { return Response.json({ greeting: "" }); }
@@ -107,21 +146,16 @@ ${body.conversation.map((m) => `${m.role}: ${m.content}`).join("\n")}`;
 
         const systemPrompt = body.lang === "ar" ? SYSTEM_AR : SYSTEM_EN;
         const userPrompt = body.lang === "ar"
-          ? `${context}\n
-اتبع اللغة العربية في جميع الردود. أجب فقط بكائن JSON واحد بدون أي شرح.`
-          : `${context}\n
-Follow the same language as the user's conversation. Answer only with a single JSON object without any explanation.`;
+          ? `${context}\nاتبع اللغة العربية في جميع الردود. أجب فقط بكائن JSON واحد بدون أي شرح.`
+          : `${context}\nFollow the same language as the user's conversation. Answer only with a single JSON object without any explanation.`;
 
         try {
-          const { text } = await generateText({
-            model,
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: userPrompt },
-            ],
-          });
+          const text = await runAI([
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ]);
 
-          const cleaned = text
+          const cleaned = String(text)
             .trim()
             .replace(/^```(?:json)?/i, "")
             .replace(/```$/, "")
@@ -148,6 +182,8 @@ Follow the same language as the user's conversation. Answer only with a single J
             const jsonText = extractJsonObject(cleaned);
             if (jsonText) {
               parsed = JSON.parse(jsonText);
+            } else {
+              throw new Error("No JSON object found in AI response");
             }
           }
           return Response.json(parsed);

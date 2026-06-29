@@ -4,7 +4,8 @@ import { Mic, Square, ArrowLeft, Camera, Send, X, CheckCircle2, Loader2 } from "
 import { AppShell } from "@/components/AppShell";
 import { useAppLang, useT } from "@/lib/use-lang";
 import { getProfile, saveReport, newTrackingId, type Report } from "@/lib/storage";
-import { resolveAuthority, type Category, CATEGORIES } from "@/lib/authorities";
+import { resolveAuthority, getLocalizedName, type Category, CATEGORIES } from "@/lib/authorities";
+import type { Lang } from "@/lib/i18n";
 
 export const Route = createFileRoute("/report")({
   head: () => ({ meta: [{ title: "Gov-Listen — New report" }] }),
@@ -13,12 +14,25 @@ export const Route = createFileRoute("/report")({
 
 type Msg = { role: "user" | "assistant"; content: string };
 
+type SpeechRecognitionAlternative = { transcript: string; confidence: number };
+
+type SpeechRecognitionResultItem = ArrayLike<SpeechRecognitionAlternative> & {
+  isFinal: boolean;
+  length: number;
+  item: (index: number) => SpeechRecognitionAlternative;
+};
+
+type SpeechRecognitionResult = ArrayLike<SpeechRecognitionResultItem> & {
+  length: number;
+  item: (index: number) => SpeechRecognitionResultItem;
+};
+
 type SpeechRecognitionLike = {
   lang: string;
   continuous: boolean;
   interimResults: boolean;
   maxAlternatives: number;
-  onresult: ((event: { resultIndex: number; results: ArrayLike<{ isFinal: boolean; transcript: string }> }) => void) | null;
+  onresult: ((event: { resultIndex: number; results: SpeechRecognitionResult }) => void) | null;
   onerror: ((event: { error: string }) => void) | null;
   onend: (() => void) | null;
   start: () => void;
@@ -71,7 +85,6 @@ function ReportPage() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, thinking, photo]);
 
-  // fetch personalised AI greeting on mount; fall back to static t.aiGreeting on error
   useEffect(() => {
     const profile = getProfile();
     if (!profile || !profile.name) return;
@@ -160,13 +173,13 @@ function ReportPage() {
       category,
       priority: ((["low", "medium", "urgent"] as const).includes(f.priority as "low" | "medium" | "urgent") ? f.priority : "medium") as Report["priority"],
       location: { address: f.address, city: profile.city, country: profile.country },
-      authority: { name: authority.name[lang], email: authority.email },
+      authority: { name: getLocalizedName(authority.name, lang), email: authority.email },
       photoDataUrl: photo ?? undefined,
       reporter: { name: profile.name, phone: profile.phone },
       status: "forwarded",
       timeline: [
         { at: now, label: lang === "ar" ? "تم استلام البلاغ" : "Report received" },
-        { at: now + 1000, label: lang === "ar" ? `تم إحالته إلى ${authority.name[lang]}` : `Forwarded to ${authority.name[lang]}` },
+        { at: now + 1000, label: lang === "ar" ? `تم إحالته إلى ${getLocalizedName(authority.name, lang)}` : `Forwarded to ${getLocalizedName(authority.name, lang)}` },
       ],
     };
     await new Promise((r) => setTimeout(r, 1200)); // dramatic pause for "AI is generating"
@@ -193,7 +206,7 @@ function ReportPage() {
       const SpeechRecognitionCtor = getSpeechRecognitionCtor();
       if (SpeechRecognitionCtor) {
         const recognition = new SpeechRecognitionCtor();
-        recognition.lang = lang === "ar" ? "ar-EG" : "en-US";
+        recognition.lang = ({ en: "en-US", ar: "ar-EG", sw: "sw-KE", yo: "yo-NG", ha: "ha-NG", am: "am-ET", xh: "xh-ZA", zu: "zu-ZA" } as Record<string, string>)[lang] ?? "en-US";
         recognition.continuous = false;
         recognition.interimResults = true;
         recognition.maxAlternatives = 1;
@@ -202,7 +215,10 @@ function ReportPage() {
           let finalText = "";
           for (let i = event.resultIndex; i < event.results.length; i += 1) {
             const result = event.results[i];
-            const transcript = Array.from(result).map((alt) => alt.transcript).join(" ");
+            let transcript = "";
+            for (let j = 0; j < result.length; j++) {
+              transcript += result[j].transcript;
+            }
             if (result.isFinal) {
               finalText += `${transcript} `;
             } else {
@@ -410,7 +426,7 @@ function ReportPage() {
   );
 }
 
-function SuccessView({ report, lang, t }: { report: Report; lang: "en" | "ar"; t: ReturnType<typeof useT> }) {
+function SuccessView({ report, lang, t }: { report: Report; lang: Lang; t: ReturnType<typeof useT> }) {
   return (
     <AppShell dir={lang === "ar" ? "rtl" : "ltr"}>
       <div className="flex-1 flex flex-col px-6 pt-12 pb-8">

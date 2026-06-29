@@ -1,6 +1,8 @@
+import type { Lang } from "./i18n";
+
 // Demo registry of African government authorities mapped by country + category.
 export type Authority = {
-  name: { en: string; ar: string };
+  name: Record<string, string>;
   email: string;
   country: string;
 };
@@ -57,7 +59,11 @@ export function resolveAuthority(countryCode: string, category: Category): Autho
   return country[category] ?? country.other;
 }
 
-export const COUNTRY_NAMES: Record<string, { en: string; ar: string }> = {
+export function getLocalizedName(name: Record<string, string>, lang: Lang): string {
+  return name[lang] ?? name.en ?? Object.values(name)[0] ?? "";
+}
+
+export const COUNTRY_NAMES: Record<string, Record<string, string>> = {
   DZ: { en: "Algeria", ar: "الجزائر" },
   AO: { en: "Angola", ar: "أنغولا" },
   BJ: { en: "Benin", ar: "بنين" },

@@ -4,6 +4,7 @@ import { ArrowLeft, FileText, ChevronRight } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { useAppLang, useT } from "@/lib/use-lang";
 import { getReports, type Report } from "@/lib/storage";
+import type { Lang } from "@/lib/i18n";
 
 export const Route = createFileRoute("/track")({
   head: () => ({ meta: [{ title: "Gov-Listen — My reports" }] }),
@@ -67,7 +68,7 @@ function TrackList() {
   );
 }
 
-function StatusPill({ status, lang, t }: { status: Report["status"]; lang: "en" | "ar"; t: ReturnType<typeof useT> }) {
+function StatusPill({ status, lang, t }: { status: Report["status"]; lang: Lang; t: ReturnType<typeof useT> }) {
   const label =
     status === "received" ? t.statusReceived :
     status === "forwarded" ? t.statusForwarded :

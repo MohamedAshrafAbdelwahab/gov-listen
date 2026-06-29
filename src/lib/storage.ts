@@ -1,9 +1,10 @@
 import type { Category } from "./authorities";
+import type { Lang } from "./i18n";
 
 export type UserProfile = {
   name: string;
   phone?: string;
-  lang: "en" | "ar";
+  lang: Lang;
   country: string; // ISO-2
   city?: string;
   consented: boolean;

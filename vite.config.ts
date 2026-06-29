@@ -4,8 +4,6 @@ import viteReact from "@vitejs/plugin-react";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import { nitro } from "nitro/vite";
 
-import { cloudflare } from "@cloudflare/vite-plugin";
-
 export default defineConfig({
   resolve: {
     alias: { "@": `${process.cwd()}/src` },
@@ -35,14 +33,9 @@ export default defineConfig({
         behavior: "error",
         client: { files: ["**/server/**"], specifiers: ["server-only"] },
       },
-      server: { entry: "server" },
     }),
     viteReact(),
-    cloudflare({
-      viteEnvironment: {
-        name: "ssr"
-      }
-    }),
+    nitro(),
   ],
   server: { host: "::", port: 8080 },
 });

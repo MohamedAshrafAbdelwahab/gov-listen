@@ -217,26 +217,24 @@ function WelcomePage() {
               </button>
             </div>
 
-            {/* Coming Soon Languages */}
-            <p className="text-[10px] font-bold tracking-[0.18em] text-muted-foreground uppercase mb-2 mt-4">قريباً | Coming Soon</p>
-            <div className="grid grid-cols-2 gap-2 mb-8">
+            <div className="space-y-2 mb-2">
               {[
-                { code: "yo", name: "Yorùbá", flag: "🇳🇬" },
-                { code: "ha", name: "Hausa", flag: "🇳🇪" },
-                { code: "am", name: "አማርኛ", flag: "🇪🇹" },
-                { code: "xh", name: "isiXhosa", flag: "🇿🇦" },
-                { code: "zu", name: "isiZulu", flag: "🇿🇦" },
+                { code: "yo", name: "Yorùbá", badge: "YO", color: "bg-emerald-500/20 text-emerald-600" },
+                { code: "ha", name: "Hausa", badge: "HA", color: "bg-orange-500/20 text-orange-600" },
+                { code: "am", name: "አማርኛ", badge: "AM", color: "bg-purple-500/20 text-purple-600" },
+                { code: "xh", name: "isiXhosa", badge: "XH", color: "bg-rose-500/20 text-rose-600" },
+                { code: "zu", name: "isiZulu", badge: "ZU", color: "bg-cyan-500/20 text-cyan-600" },
               ].map((l) => (
-                <div key={l.code} className="card-soft p-3 rounded-xl flex items-center gap-2 relative overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent opacity-0 hover:opacity-100 transition-opacity" />
-                  <span className="text-2xl">{l.flag}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm text-foreground truncate">{l.name}</p>
-                  </div>
-                  <div className="absolute top-1 right-1 bg-primary text-primary-foreground text-[8px] font-bold px-2 py-0.5 rounded-full">
-                    Soon
-                  </div>
-                </div>
+                <button
+                  key={l.code}
+                  type="button"
+                  onClick={() => setLang(l.code as typeof lang)}
+                  className={`w-full card-soft p-4 flex items-center gap-3 transition-all active:scale-[0.98] ${lang === l.code ? "ring-2 ring-primary" : ""}`}
+                >
+                  <span className={`size-9 rounded-lg grid place-items-center font-bold text-sm ${l.color}`}>{l.badge}</span>
+                  <span className="flex-1 text-start font-semibold text-foreground">{l.name}</span>
+                  {lang === l.code && <CheckCircle2 className="size-5 text-primary" />}
+                </button>
               ))}
             </div>
 
